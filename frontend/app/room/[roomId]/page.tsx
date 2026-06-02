@@ -171,6 +171,8 @@ export default function RoomPage() {
         if (data.audioUrl) {
           finalUrl = data.directUrl + '||' + data.audioUrl
         }
+
+        finalUrl = `${BACKEND}/api/proxy?url=${encodeURIComponent(finalUrl)}`
       } catch (e: any) {
         alert('Не удалось загрузить видео: ' + e.message)
         setResolvingVideo(false)

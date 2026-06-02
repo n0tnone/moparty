@@ -7,6 +7,8 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const server = http.createServer(app);
 
+
+
 const allowedOrigins = process.env.FRONTEND_URL
   ? [process.env.FRONTEND_URL]
   : ['http://localhost:3000'];
@@ -64,6 +66,31 @@ app.post('/api/rooms', (req, res) => {
   };
   res.json({ roomId });
 });
+
+const https = require('https')
+
+app.get('/api/proxy', (req, res) => {
+  const url = req.query.url
+  if (!url) return res.status(400).end()
+  
+  const client = url.startsWith('https') ? https : http
+  client.get(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://vkvideo.ru/',
+    }
+  }, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, {
+      'Content-Type': proxyRes.headers['content-type'] || 'video/mp4',
+      'Content-Length': proxyRes.headers['content-length'] || '',
+      'Accept-Ranges': 'bytes',
+      'Access-Control-Allow-Origin': '*',
+    })
+    proxyRes.pipe(res)
+  }).on('error', (e) => {
+    res.status(500).end()
+  })
+})
 
 // Get room info
 app.get('/api/rooms/:roomId', (req, res) => {
