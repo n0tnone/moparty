@@ -1,0 +1,8 @@
+{
+  "name": "moparty",
+  "scripts": {
+    "dev:backend": "cd backend && npm install && node server.js",
+    "dev:frontend": "cd frontend && npm install && npm run dev",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  }
+}

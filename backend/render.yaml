@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: moparty-backend
+    runtime: node
+    buildCommand: pip install yt-dlp && npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 4000
+      - key: FRONTEND_URL
+        sync: false
