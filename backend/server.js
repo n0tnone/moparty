@@ -23,6 +23,17 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
+// Добавь ЭТО сразу после app.use(express.json());
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 const { execFile } = require('child_process')
 
 app.post('/api/resolve', (req, res) => {
@@ -70,28 +81,96 @@ app.post('/api/rooms', (req, res) => {
 const https = require('https')
 
 app.get('/api/proxy', (req, res) => {
-  const url = req.query.url
-  if (!url) return res.status(400).end()
+  const videoUrl = req.query.url;
+  if (!videoUrl) return res.status(400).json({ error: 'No URL provided' });
   
-  const client = url.startsWith('https') ? https : http
-  client.get(url, {
+  console.log('Proxying URL:', videoUrl);
+  
+  // Парсим URL для правильной обработки
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(videoUrl);
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+  
+  const client = parsedUrl.protocol === 'https:' ? https : http;
+  
+  const options = {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Referer': 'https://vkvideo.ru/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
+      'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Encoding': 'identity', // Не просим сжатие для видео
+      'Referer': 'https://vk.com/',
+      'Origin': 'https://vk.com',
+      'Range': req.headers.range || '', // Поддержка частичных запросов
+      'Connection': 'keep-alive',
+      'Sec-Fetch-Dest': 'video',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'cross-site'
+    },
+    timeout: 30000
+  };
+  
+  // Добавляем range если есть
+  if (req.headers.range) {
+    options.headers.Range = req.headers.range;
+  }
+  
+  const proxyRequest = client.get(videoUrl, options, (proxyRes) => {
+    // Логируем статус для отладки
+    console.log('Proxy response status:', proxyRes.statusCode);
+    
+    // Если редирект - следуем за ним
+    if (proxyRes.statusCode === 301 || proxyRes.statusCode === 302 || proxyRes.statusCode === 307) {
+      const redirectUrl = proxyRes.headers.location;
+      console.log('Redirecting to:', redirectUrl);
+      if (redirectUrl) {
+        // Делаем новый запрос на редирект
+        const redirectClient = redirectUrl.startsWith('https') ? https : http;
+        const redirectOptions = { ...options, headers: { ...options.headers } };
+        
+        redirectClient.get(redirectUrl, redirectOptions, (redirectRes) => {
+          res.writeHead(redirectRes.statusCode, {
+            'Content-Type': redirectRes.headers['content-type'] || 'video/mp4',
+            'Content-Length': redirectRes.headers['content-length'] || '',
+            'Accept-Ranges': 'bytes',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=3600'
+          });
+          redirectRes.pipe(res);
+        }).on('error', (e) => {
+          console.error('Redirect error:', e.message);
+          res.status(500).json({ error: 'Redirect failed' });
+        });
+        return;
+      }
     }
-  }, (proxyRes) => {
+    
+    // Успешный ответ
     res.writeHead(proxyRes.statusCode, {
       'Content-Type': proxyRes.headers['content-type'] || 'video/mp4',
       'Content-Length': proxyRes.headers['content-length'] || '',
       'Accept-Ranges': 'bytes',
       'Access-Control-Allow-Origin': '*',
-    })
-    proxyRes.pipe(res)
-  }).on('error', (e) => {
-    res.status(500).end()
-  })
-})
-
+      'Access-Control-Expose-Headers': 'Content-Length, Content-Range',
+      'Cache-Control': 'public, max-age=3600'
+    });
+    
+    proxyRes.pipe(res);
+  });
+  
+  proxyRequest.on('error', (e) => {
+    console.error('Proxy error:', e.message);
+    res.status(500).json({ error: 'Proxy failed: ' + e.message });
+  });
+  
+  proxyRequest.on('timeout', () => {
+    proxyRequest.destroy();
+    res.status(504).json({ error: 'Request timeout' });
+  });
+});
 // Get room info
 app.get('/api/rooms/:roomId', (req, res) => {
   const room = rooms[req.params.roomId];
