@@ -37,27 +37,28 @@ app.use((req, res, next) => {
 const { execFile } = require('child_process')
 
 app.post('/api/resolve', (req, res) => {
-  const { url } = req.body
-  if (!url) return res.status(400).json({ error: 'no url' })
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'no url' });
 
   execFile('yt-dlp', [
-    '-f', 'best[vcodec!=none][acodec!=none]/best',
+    '-f', 'best',
     '--get-url',
     '--no-playlist',
     url
   ], { timeout: 60000 }, (err, stdout, stderr) => {
     if (err) {
-      console.error('yt-dlp error:', stderr)
-      return res.status(500).json({ error: stderr || err.message })
+      console.error('yt-dlp error:', stderr);
+      return res.status(500).json({ error: stderr || err.message });
     }
-    const urls = stdout.trim().split('\n').filter(Boolean)
-    // Если две ссылки — видео+аудио, если одна — всё в одной
+    const urls = stdout.trim().split('\n').filter(Boolean);
+    
+    // Возвращаем ПРЯМУЮ ссылку на видео VK
     res.json({ 
-      directUrl: urls[0],
+      directUrl: urls[0], // Прямой URL VK CDN
       audioUrl: urls[1] || null
-    })
-  })
-})
+    });
+  });
+});
 
 // In-memory rooms store
 const rooms = {};

@@ -167,12 +167,13 @@ export default function RoomPage() {
         })
         const data = await res.json()
         if (!res.ok || !data.directUrl) throw new Error(data.error || 'ошибка')
+        
+        // 👇 ПОЛУЧАЕМ ПРЯМУЮ ССЫЛКУ ОТ VK
         finalUrl = data.directUrl
-        if (data.audioUrl) {
-          finalUrl = data.directUrl + '||' + data.audioUrl
-        }
-
-        finalUrl = `${BACKEND}/api/proxy?url=${encodeURIComponent(finalUrl)}`
+        
+        // ⚠️ НЕ ДОБАВЛЯЕМ ПРОКСИ! Просто прямая ссылка VK
+        // finalUrl = `${BACKEND}/api/proxy?url=${encodeURIComponent(finalUrl)}` // ❌ УБИРАЕМ!
+        
       } catch (e: any) {
         alert('Не удалось загрузить видео: ' + e.message)
         setResolvingVideo(false)
@@ -181,13 +182,14 @@ export default function RoomPage() {
         setResolvingVideo(false)
       }
     }
-
+    
+    // ✅ ДЛЯ ПРЯМЫХ ССЫЛОК ТОЖЕ НЕ НУЖЕН ПРОКСИ
+    console.log('Setting video URL:', finalUrl)
     socketRef.current?.emit('set_video', { roomId, videoSrc: finalUrl, videoType: 'url' })
     setVideoUrl(finalUrl)
     setVideoUrlInput('')
     setShowVideoModal(false)
   }
-
   const setVideoFromFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !socketRef.current) return
