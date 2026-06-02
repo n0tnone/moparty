@@ -98,3 +98,137 @@ html, body {
 .vjs-load-progress { background: rgba(91,143,255,0.2) !important; }
 .vjs-volume-level { background: var(--accent) !important; }
 .vjs-slider { background: rgba(255,255,255,0.1) !important; }
+
+/* ===== FIXES ДЛЯ ЧАТА И ЛАЙАУТА ===== */
+
+/* 1. Фикс общей высоты страницы - чтобы не скроллилась */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* 2. Контейнер приложения на полный экран без скролла */
+#__next, main, .room-container {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 3. Десктопный чат - правильные размеры */
+.desktop-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* 4. Список участников с фиксированной высотой */
+.members-list {
+  flex-shrink: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* 5. Контейнер сообщений чата - скроллится */
+.chat-messages-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* КЛЮЧЕВОЙ МОМЕНТ для flex скролла */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 6. Красивый скролл для чата */
+.chat-messages-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-messages-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-messages-container::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 4px;
+}
+
+/* 7. Мобильный чат оверлей */
+.mobile-chat-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80vh;
+  background: rgba(13,16,23,0.98);
+  backdrop-filter: blur(20px);
+  border-radius: 24px 24px 0 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+
+/* 8. Кнопка чата поверх плеера */
+.chat-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.chat-fab:hover {
+  background: var(--accent);
+  transform: scale(1.05);
+}
+
+/* 9. Скрываем десктопный чат на мобилках */
+@media (max-width: 767px) {
+  .desktop-chat {
+    display: none !important;
+  }
+  
+  .chat-fab {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .chat-fab {
+    display: none !important;
+  }
+  .mobile-chat-overlay {
+    display: none !important;
+  }
+}
+
+/* 10. Фикс для VideoPlayer контейнера */
+.video-player-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* 11. Убираем скролл у модалок */
+.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
