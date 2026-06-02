@@ -28,7 +28,7 @@ app.post('/api/resolve', (req, res) => {
   if (!url) return res.status(400).json({ error: 'no url' })
 
   execFile('yt-dlp', [
-    '-f', 'hls-1038/hls-617/hls-453/hls-304/hls-229',
+    '-f', 'best[vcodec!=none][acodec!=none]/best',
     '--get-url',
     '--no-playlist',
     url
