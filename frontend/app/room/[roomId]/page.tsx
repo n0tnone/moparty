@@ -48,6 +48,7 @@ export default function RoomPage() {
   const [videoUrl, setVideoUrl] = useState('')
   const [videoUrlInput, setVideoUrlInput] = useState('')
   const [chatOpen, setChatOpen] = useState(false)
+  const chatOpenRef = useRef(false)
   const [unread, setUnread] = useState(0)
   const [mySocketId, setMySocketId] = useState<string>('')
   const [myCurrentTime, setMyCurrentTime] = useState<number>(0)
@@ -55,6 +56,11 @@ export default function RoomPage() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleChatOpen = (val: boolean) => {
+    chatOpenRef.current = val
+    setChatOpen(val)
+  }
 
   useEffect(() => {
     const saved = localStorage.getItem('moparty_nickname')
@@ -97,7 +103,7 @@ export default function RoomPage() {
       setMessages(prev => [...prev, msg])
       if (msg.type === 'message' && msg.userId !== s.id) {
         playNotify()
-        setUnread(u => u + 1)
+        if (!chatOpenRef.current) setUnread(u => u + 1)
       }
     })
 
@@ -105,7 +111,14 @@ export default function RoomPage() {
       setVideoUrl(videoSrc)
     })
 
-    s.on('disconnect', () => setConnected(false))
+    s.on('disconnect', () => {
+      setConnected(false)
+      // авто-реконнект socket.io делает сам, но нужно переджойнить комнату
+    })
+
+    s.on('reconnect', () => {
+      s.emit('join_room', { roomId, nickname })
+    })
 
     const timeInterval = setInterval(() => {
       const p = (window as any).__mopartyPlayer
@@ -468,7 +481,7 @@ export default function RoomPage() {
       {/* Mobile chat FAB button */}
       <button
         className="chat-fab"
-        onClick={() => setChatOpen(true)}
+        onClick={() => handleChatOpen(true)}
       >
         💬
         {unread > 0 && (
@@ -496,7 +509,7 @@ export default function RoomPage() {
             background: 'rgba(9,11,16,0.8)',
             backdropFilter: 'blur(8px)',
           }}
-          onClick={() => setChatOpen(false)}
+          onClick={() => handleChatOpen(false)}
         >
           <div
             className="glass"
@@ -520,7 +533,7 @@ export default function RoomPage() {
               flexShrink: 0,
             }}>
               <span style={{ fontSize: 16, fontWeight: 600 }}>Чат</span>
-              <button onClick={() => setChatOpen(false)} style={{
+              <button onClick={() => handleChatOpen(false)} style={{
                 width: 32, height: 32, borderRadius: '50%',
                 background: 'rgba(255,255,255,0.06)',
                 border: '1px solid var(--glass-border)',

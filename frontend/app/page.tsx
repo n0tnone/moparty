@@ -9,7 +9,7 @@ export default function Home() {
   const createRoom = async () => {
     setLoading(true)
     try {
-      const backendUrl = 'https://moparty-backend.up.railway.app'
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
       const res = await fetch(`${backendUrl}/api/rooms`, { method: 'POST' })
       const { roomId } = await res.json()
       router.push(`/room/${roomId}`)
