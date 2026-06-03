@@ -36,29 +36,41 @@ app.use((req, res, next) => {
 
 const { execFile } = require('child_process')
 
-app.post('/api/resolve', (req, res) => {
-  const { url } = req.body;
-  if (!url) return res.status(400).json({ error: 'no url' });
+app.post('/api/resolve', async (req, res) => {
+  const { url } = req.body
+  if (!url) return res.status(400).json({ error: 'no url' })
 
-  execFile('yt-dlp', [
-    '-f', 'best',
-    '--get-url',
-    '--no-playlist',
-    url
-  ], { timeout: 60000 }, (err, stdout, stderr) => {
-    if (err) {
-      console.error('yt-dlp error:', stderr);
-      return res.status(500).json({ error: stderr || err.message });
-    }
-    const urls = stdout.trim().split('\n').filter(Boolean);
+  try {
+    // Пробуем через Cobalt
+    const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ url, vCodec: 'h264', vQuality: 'max', isAudioOnly: false })
+    })
     
-    // Возвращаем ПРЯМУЮ ссылку на видео VK
-    res.json({ 
-      directUrl: urls[0], // Прямой URL VK CDN
-      audioUrl: urls[1] || null
-    });
-  });
-});
+    const cobalt = await cobaltRes.json()
+    
+    if (cobalt.status === 'stream' || cobalt.status === 'redirect') {
+      return res.json({ directUrl: cobalt.url })
+    }
+    
+    throw new Error('cobalt failed')
+  } catch {
+    // Fallback на yt-dlp
+    const { execFile } = require('child_process')
+    execFile('yt-dlp', [
+      '-f', 'best[protocol=m3u8_native]/best',
+      '--get-url', '--no-playlist', url
+    ], { timeout: 60000 }, (err, stdout, stderr) => {
+      if (err) return res.status(500).json({ error: stderr || err.message })
+      const urls = stdout.trim().split('\n').filter(Boolean)
+      res.json({ directUrl: urls[0] })
+    })
+  }
+})
 
 // In-memory rooms store
 const rooms = {};
