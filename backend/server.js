@@ -37,30 +37,35 @@ app.use((req, res, next) => {
 const { execFile } = require('child_process')
 
 app.post('/api/resolve', async (req, res) => {
-  const { url } = req.body
+  const { url, isIOS } = req.body
   if (!url) return res.status(400).json({ error: 'no url' })
 
+  // Для iOS сразу идём в yt-dlp за HLS
+  if (isIOS) {
+    execFile('yt-dlp', [
+      '-f', 'best[protocol=m3u8_native]/best[protocol=m3u8]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
+      '--get-url', '--no-playlist', url
+    ], { timeout: 60000 }, (err, stdout, stderr) => {
+      if (err) return res.status(500).json({ error: stderr || err.message })
+      const urls = stdout.trim().split('\n').filter(Boolean)
+      res.json({ directUrl: urls[0] })
+    })
+    return
+  }
+
+  // Для остальных — сначала Cobalt
   try {
-    // Пробуем через Cobalt
     const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ url, vCodec: 'h264', vQuality: 'max', isAudioOnly: false })
     })
-    
     const cobalt = await cobaltRes.json()
-    
     if (cobalt.status === 'stream' || cobalt.status === 'redirect') {
       return res.json({ directUrl: cobalt.url })
     }
-    
     throw new Error('cobalt failed')
   } catch {
-    // Fallback на yt-dlp
-    const { execFile } = require('child_process')
     execFile('yt-dlp', [
       '-f', 'best[protocol=m3u8_native]/best',
       '--get-url', '--no-playlist', url

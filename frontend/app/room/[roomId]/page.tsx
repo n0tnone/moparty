@@ -334,6 +334,7 @@ export default function RoomPage() {
     if (!videoUrlInput.trim() || !socketRef.current) return
     const raw = videoUrlInput.trim()
     const isDirect = /\.(mp4|m3u8|webm|mkv|avi)(\?|$)/i.test(raw)
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)  // <- добавь
 
     let finalUrl = raw
 
@@ -343,7 +344,7 @@ export default function RoomPage() {
         const res = await fetch(`${BACKEND}/api/resolve`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: raw }),
+          body: JSON.stringify({ url: raw, isIOS }),  // <- передай isIOS
         })
         const data = await res.json()
         if (!res.ok || !data.directUrl) throw new Error(data.error || 'ошибка')
@@ -356,7 +357,7 @@ export default function RoomPage() {
         setResolvingVideo(false)
       }
     }
-    
+
     socketRef.current?.emit('set_video', { roomId, videoSrc: finalUrl, videoType: 'url' })
     setVideoUrl(finalUrl)
     setVideoUrlInput('')
