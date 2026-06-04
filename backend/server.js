@@ -221,8 +221,9 @@ io.on('connection', (socket) => {
       videoType: room.videoType,
       state: room.state,
       members: Object.values(room.members),
-      messages: room.messages.slice(-100),
-    });
+      messages: room.messages.slice(-20), // только последние 20
+      totalMessages: room.messages.length, // чтобы фронт знал есть ли ещё
+    })
 
     // Notify others
     socket.to(roomId).emit('member_joined', currentUser);
@@ -238,6 +239,17 @@ io.on('connection', (socket) => {
     room.messages.push(sysMsg);
     io.to(roomId).emit('chat_message', sysMsg);
   });
+
+  socket.on('load_more_messages', ({ roomId, beforeId }) => {
+    const room = rooms[roomId]
+    if (!room) return
+    
+    const idx = room.messages.findIndex(m => m.id === beforeId)
+    if (idx <= 0) return
+    
+    const earlier = room.messages.slice(Math.max(0, idx - 20), idx)
+    socket.emit('more_messages', { messages: earlier, hasMore: idx - 20 > 0 })
+  })
 
   // Video source set by host
   socket.on('set_video', ({ roomId, videoSrc, videoType }) => {

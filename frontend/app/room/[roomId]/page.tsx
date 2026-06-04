@@ -81,6 +81,9 @@ export default function RoomPage() {
   const chatInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesRef = useRef<Message[]>([])
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
   const [toasts, setToasts] = useState<Array<{id: string; text: string; type: 'action'|'chat'; nickname?: string}>>([])
   const toastTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
@@ -130,7 +133,8 @@ export default function RoomPage() {
       if (data.members) setMembers(data.members)
       if (data.messages) {
         setMessages(data.messages)
-        messagesRef.current = data.messages // синхронизируем ref
+        messagesRef.current = data.messages
+        setHasMoreMessages(data.totalMessages > data.messages.length)
       }
     })
 
@@ -288,6 +292,12 @@ export default function RoomPage() {
     } else {
       setNicknameSet(true)
     }
+  }
+
+  const loadMoreMessages = () => {
+    if (loadingMore || !hasMoreMessages || !messages.length) return
+    setLoadingMore(true)
+    socketRef.current?.emit('load_more_messages', { roomId, beforeId: messages[0].id })
   }
 
   const setVideoFromUrl = async () => {
@@ -698,6 +708,10 @@ export default function RoomPage() {
               myId={mySocketId}
               EMOJIS={EMOJIS}
               typingUsers={typingUsers}
+              hasMoreMessages={hasMoreMessages}
+              loadingMore={loadingMore}
+              onLoadMore={loadMoreMessages}
+              chatScrollRef={chatScrollRef}
             />
           </div>
         </div>
@@ -779,6 +793,10 @@ export default function RoomPage() {
                 chatEndRef={chatEndRef}
                 myId={mySocketId}
                 EMOJIS={EMOJIS}
+                hasMoreMessages={hasMoreMessages}
+                loadingMore={loadingMore}
+                onLoadMore={loadMoreMessages}
+                chatScrollRef={chatScrollRef}
               />
             </div>
           </div>
@@ -879,42 +897,63 @@ export default function RoomPage() {
 }
 
 // ---- ChatPanel component (ИСПРАВЛЕННЫЙ) ----
-function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, setShowEmoji, addEmoji, chatInputRef, chatEndRef, myId, EMOJIS, typingUsers = {}}: any) {
+function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, setShowEmoji, addEmoji, chatInputRef, chatEndRef, myId, EMOJIS, typingUsers = {}, hasMoreMessages, loadingMore, onLoadMore, chatScrollRef }: any) {
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop < 50 && !loadingMore) {
+      onLoadMore?.()
+    }
+  }
+
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      overflow: 'hidden',
-    }}>
-      {/* Messages container - скролл тут */}
-      <div className="chat-messages-container" style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '12px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        minHeight: 0,
-      }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+
+      {/* Messages */}
+      <div
+        ref={chatScrollRef}
+        className="chat-messages-container"
+        onScroll={handleScroll}
+        style={{
+          flex: 1, overflowY: 'auto', padding: '12px 16px',
+          display: 'flex', flexDirection: 'column', gap: 4, minHeight: 0,
+        }}
+      >
+        {/* Кнопка загрузить ещё */}
+        {hasMoreMessages && (
+          <div style={{ textAlign: 'center', padding: '4px 0 8px' }}>
+            {loadingMore ? (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Загрузка...</span>
+            ) : (
+              <button onClick={onLoadMore} style={{
+                fontSize: 12, color: 'var(--accent)',
+                background: 'none', border: 'none', cursor: 'pointer', padding: '4px 12px',
+              }}>
+                ↑ Загрузить ещё
+              </button>
+            )}
+          </div>
+        )}
+
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, marginTop: 40 }}>
             Пока нет сообщений 👀
           </div>
         )}
+
         {messages.map((msg: Message) =>
           msg.type === 'system' ? (
             <div key={msg.id} style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', padding: '4px 0' }}>
               {msg.text}
             </div>
           ) : (
-            <div key={msg.id} style={{
-              display: 'flex',
-              flexDirection: msg.userId === myId ? 'row-reverse' : 'row',
-              gap: 8,
-              alignItems: 'flex-end',
-              marginBottom: 2,
-            }}>
+            <div
+              key={msg.id}
+              data-msg-id={msg.id}
+              style={{
+                display: 'flex',
+                flexDirection: msg.userId === myId ? 'row-reverse' : 'row',
+                gap: 8, alignItems: 'flex-end', marginBottom: 2,
+              }}
+            >
               <div style={{ borderRadius: 6, overflow: 'hidden', flexShrink: 0, width: 26, height: 26 }}>
                 <UserAvatar name={msg.nickname || '?'} size={26} />
               </div>
@@ -924,17 +963,15 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
                     {msg.nickname}
                   </div>
                 )}
-                <div style={{
-                  padding: '8px 12px',
-                  borderRadius: msg.userId === myId ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                  background: msg.userId === myId ? 'var(--accent-dim)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${msg.userId === myId ? 'rgba(91,143,255,0.2)' : 'var(--glass-border)'}`,
-                  fontSize: 14,
-                  lineHeight: 1.4,
-                  wordBreak: 'break-word',
-                }}>
-                  {msg.text}
-                </div>
+              <div style={{
+                padding: '8px 12px',
+                borderRadius: msg.userId === myId ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
+                background: msg.userId === myId ? 'var(--accent-dim)' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${msg.userId === myId ? 'rgba(91,143,255,0.2)' : 'var(--glass-border)'}`,
+                fontSize: 14, lineHeight: 1.4, wordBreak: 'break-word',
+              }}>
+                {msg.text}
+              </div>
               </div>
             </div>
           )
@@ -945,23 +982,14 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
       {/* Emoji picker */}
       {showEmoji && (
         <div style={{
-          padding: '8px 12px',
-          borderTop: '1px solid var(--glass-border)',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 4,
-          flexShrink: 0,
+          padding: '8px 12px', borderTop: '1px solid var(--glass-border)',
+          display: 'flex', flexWrap: 'wrap', gap: 4, flexShrink: 0,
         }}>
           {EMOJIS.map((e: string) => (
             <button key={e} onClick={() => addEmoji(e)} style={{
-              background: 'none',
-              border: 'none',
-              fontSize: 22,
-              cursor: 'pointer',
-              padding: '4px 6px',
-              borderRadius: 8,
-              minWidth: 44,
-              minHeight: 44,
+              background: 'none', border: 'none', fontSize: 22,
+              cursor: 'pointer', padding: '4px 6px', borderRadius: 8,
+              minWidth: 44, minHeight: 44,
             }}>
               {e}
             </button>
@@ -969,35 +997,23 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
         </div>
       )}
 
+      {/* Typing indicator */}
       {Object.keys(typingUsers).length > 0 && (
-        <div style={{
-          padding: '4px 16px',
-          fontSize: 12,
-          color: 'var(--text-muted)',
-          fontStyle: 'italic',
-          flexShrink: 0,
-        }}>
+        <div style={{ padding: '4px 16px', fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', flexShrink: 0 }}>
           {Object.values(typingUsers).join(', ')} печатает...
         </div>
       )}
 
-      {/* Input area */}
+      {/* Input */}
       <div style={{
-        padding: '12px',
-        borderTop: '1px solid var(--glass-border)',
-        display: 'flex',
-        gap: 8,
-        alignItems: 'flex-end',
-        flexShrink: 0,
+        padding: '12px', borderTop: '1px solid var(--glass-border)',
+        display: 'flex', gap: 8, alignItems: 'flex-end', flexShrink: 0,
       }}>
         <button onClick={() => setShowEmoji((v: boolean) => !v)} style={{
-          width: 40, height: 40,
-          borderRadius: 'var(--radius-sm)',
+          width: 40, height: 40, borderRadius: 'var(--radius-sm)',
           background: showEmoji ? 'var(--accent-dim)' : 'rgba(255,255,255,0.05)',
           border: `1px solid ${showEmoji ? 'var(--accent)' : 'var(--glass-border)'}`,
-          fontSize: 18,
-          cursor: 'pointer',
-          flexShrink: 0,
+          fontSize: 18, cursor: 'pointer', flexShrink: 0,
         }}>😊</button>
 
         <input
@@ -1008,33 +1024,20 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
           placeholder="Сообщение..."
           maxLength={500}
           style={{
-            flex: 1,
-            padding: '10px 14px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid var(--glass-border)',
-            color: 'var(--text-primary)',
-            fontSize: 16,
-            outline: 'none',
+            flex: 1, padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+            background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)',
+            color: 'var(--text-primary)', fontSize: 16, outline: 'none',
           }}
         />
 
-        <button
-          onClick={sendChat}
-          disabled={!chatInput.trim()}
-          style={{
-            width: 40, height: 40,
-            borderRadius: 'var(--radius-sm)',
-            background: chatInput.trim() ? 'var(--accent)' : 'rgba(91,143,255,0.2)',
-            border: 'none',
-            color: '#fff',
-            fontSize: 18,
-            cursor: chatInput.trim() ? 'pointer' : 'not-allowed',
-            flexShrink: 0,
-          }}
-        >➤</button>
+        <button onClick={sendChat} disabled={!chatInput.trim()} style={{
+          width: 40, height: 40, borderRadius: 'var(--radius-sm)',
+          background: chatInput.trim() ? 'var(--accent)' : 'rgba(91,143,255,0.2)',
+          border: 'none', color: '#fff', fontSize: 18,
+          cursor: chatInput.trim() ? 'pointer' : 'not-allowed', flexShrink: 0,
+        }}>➤</button>
       </div>
-      
+
     </div>
   )
 }
