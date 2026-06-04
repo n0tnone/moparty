@@ -145,18 +145,18 @@ export default function RoomPage() {
     s.on('members_update', (m: Member[]) => setMembers(m))
 
     s.on('player_play', ({ nickname, userId }: any) => {
-      if (userId === s.id) return // не показываем себе
-      addToast({ id: Date.now() + 'play', text: `▶ ${nickname} запустил видео`, type: 'action' }, 3000)
+      if (userId === s.id) return
+      addToast({ id: `play_${Date.now()}_${Math.random()}`, text: `▶ ${nickname} запустил видео`, type: 'action' }, 3000)
     })
 
     s.on('player_pause', ({ nickname, userId }: any) => {
       if (userId === s.id) return
-      addToast({ id: Date.now() + 'pause', text: `⏸ ${nickname} поставил на паузу`, type: 'action' }, 3000)
+      addToast({ id: `pause_${Date.now()}_${Math.random()}`, text: `⏸ ${nickname} поставил на паузу`, type: 'action' }, 3000)
     })
 
     s.on('player_seek', ({ nickname, userId }: any) => {
       if (userId === s.id) return
-      addToast({ id: Date.now() + 'seek', text: `⏩ ${nickname} перемотал`, type: 'action' }, 3000)
+      addToast({ id: `seek_${Date.now()}_${Math.random()}`, text: `⏩ ${nickname} перемотал`, type: 'action' }, 3000)
     })
 
     s.on('chat_message', (msg: Message) => {
@@ -193,7 +193,7 @@ export default function RoomPage() {
       if (msg.type === 'message' && msg.userId !== s.id) {
         const duration = Math.min(2000 + msg.text.length * 40, 5000)
         addToast({
-          id: 'chat_' + msg.id,
+          id: `chat_${msg.id}_${Math.random()}`,
           text: msg.text,
           type: 'chat',
           nickname: msg.nickname,
