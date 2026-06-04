@@ -23,6 +23,25 @@ interface Member {
   nickname: string
 }
 
+const isPolina = (name: string) => {
+  const n = name.trim().toLowerCase()
+  return (
+    n.startsWith('полин') ||
+    n.startsWith('поля') ||
+    n.startsWith('полян') ||
+    n.startsWith('палин') ||
+    n === 'пол'
+  )
+}
+
+const POLINA_FACTS = [
+  { emoji: '🌸', title: 'А вы знали?', text: 'Полина — самая красивая девушка во всей вселенной. Это научно доказанный факт ✨' },
+  { emoji: '💜', title: 'Секретная информация', text: 'Учёные установили: когда Полина улыбается, настроение поднимается у всех в радиусе 100 метров 😊' },
+  { emoji: '✨', title: 'Официальная статистика', text: 'По данным мировой статистики, Полина является причиной хорошего настроения у окружающих в 99.9% случаев 📊' },
+  { emoji: '🌙', title: 'Исторический факт', text: 'Говорят, из-за таких людей как Полина астрономы называют самые яркие звёзды особыми именами ⭐' },
+  { emoji: '🎀', title: 'Психологический факт', text: 'Психологи утверждают: одно присутствие Полины делает любую вечеринку в десять раз лучше 🎉' },
+]
+
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
 const EMOJIS = ['❤️','😂','😮','👍','🔥','🎬','😭','🤣','💀','👀','🙌','✨']
 
@@ -52,6 +71,8 @@ export default function RoomPage() {
   const [unread, setUnread] = useState(0)
   const [mySocketId, setMySocketId] = useState<string>('')
   const [myCurrentTime, setMyCurrentTime] = useState<number>(0)
+  const [polinaScreen, setPolinaScreen] = useState(false)
+  const [polinaFactIdx, setPolinaFactIdx] = useState(0)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLInputElement>(null)
@@ -64,7 +85,10 @@ export default function RoomPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem('moparty_nickname')
-    if (saved) setNicknameInput(saved)
+    if (saved) {
+      setNicknameInput(saved)
+        
+    }
   }, [])
 
   // Scroll chat to bottom
@@ -75,6 +99,7 @@ export default function RoomPage() {
 
   // Socket setup after nickname
   useEffect(() => {
+    
     if (!nicknameSet) return
 
     const s = io(BACKEND, { transports: ['websocket', 'polling'] })
@@ -157,6 +182,17 @@ export default function RoomPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleEnter = () => {
+    if (!nicknameInput.trim()) return
+    localStorage.setItem('moparty_nickname', nicknameInput.trim())
+    setNickname(nicknameInput.trim())
+    if (isPolina(nicknameInput.trim())) {
+      setPolinaScreen(true)
+    } else {
+      setNicknameSet(true)
+    }
+  }
+
   const setVideoFromUrl = async () => {
     if (!videoUrlInput.trim() || !socketRef.current) return
     const raw = videoUrlInput.trim()
@@ -206,6 +242,107 @@ export default function RoomPage() {
   }
 
   // ---- Nickname screen ----
+
+  if (polinaScreen) {
+    const fact = POLINA_FACTS[polinaFactIdx]
+    return (
+      <main style={{
+        minHeight: '100dvh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        background: '#0d0f17',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Звёздочки фон */}
+        {Array.from({ length: 40 }).map((_, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.6)',
+            width: 1 + Math.random() * 2,
+            height: 1 + Math.random() * 2,
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            animation: `sparkle ${2 + Math.random() * 3}s ${Math.random() * 4}s infinite`,
+          }} />
+        ))}
+
+        <style>{`
+          @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+          @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+          @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+          @keyframes sparkle { 0%,100% { opacity: 0; transform: scale(0); } 50% { opacity: 1; transform: scale(1); } }
+        `}</style>
+
+        <div style={{
+          textAlign: 'center',
+          maxWidth: 400,
+          animation: 'fadeInUp 0.6s ease-out',
+          position: 'relative',
+          zIndex: 2,
+        }}>
+          <div style={{ fontSize: 72, marginBottom: 16, display: 'block', animation: 'pulse 2s ease-in-out infinite' }}>
+            {fact.emoji}
+          </div>
+
+          <h2 style={{
+            fontSize: 22,
+            fontWeight: 600,
+            marginBottom: 16,
+            background: 'linear-gradient(135deg, #fff 0%, #c084fc 50%, #f472b6 100%)',
+            backgroundSize: '200% auto',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            animation: 'shimmer 3s linear infinite',
+          }}>{fact.title}</h2>
+
+          {/* Точки-индикаторы */}
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 20 }}>
+            {POLINA_FACTS.map((_, i) => (
+              <div key={i} style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: i === polinaFactIdx ? '#c084fc' : 'rgba(255,255,255,0.2)',
+                transform: i === polinaFactIdx ? 'scale(1.4)' : 'scale(1)',
+                transition: 'all 0.3s',
+              }} />
+            ))}
+          </div>
+
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 32, minHeight: 60 }}>
+            {fact.text}
+          </p>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setPolinaFactIdx(i => (i + 1) % POLINA_FACTS.length)}
+              style={{
+                padding: '12px 24px', borderRadius: 100, border: 'none',
+                background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Ещё факт 💫
+            </button>
+            <button
+              onClick={() => { setPolinaScreen(false); setNicknameSet(true) }}
+              style={{
+                padding: '12px 24px', borderRadius: 100,
+                border: '1.5px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255,255,255,0.06)',
+                color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Войти в комнату →
+            </button>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
   if (!nicknameSet) {
     return (
       <main style={{
@@ -238,11 +375,7 @@ export default function RoomPage() {
             value={nicknameInput}
             onChange={e => setNicknameInput(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter' && nicknameInput.trim()) {
-                localStorage.setItem('moparty_nickname', nicknameInput.trim())
-                setNickname(nicknameInput.trim())
-                setNicknameSet(true)
-              }
+              if (e.key === 'Enter') handleEnter()
             }}
             placeholder="Твой никнейм"
             maxLength={20}
@@ -260,13 +393,7 @@ export default function RoomPage() {
             }}
           />
           <button
-            onClick={() => {
-              if (nicknameInput.trim()) {
-                localStorage.setItem('moparty_nickname', nicknameInput.trim())
-                setNickname(nicknameInput.trim())
-                setNicknameSet(true)
-              }
-            }}
+            onClick={handleEnter}
             disabled={!nicknameInput.trim()}
             style={{
               width: '100%',

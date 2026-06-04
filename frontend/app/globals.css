@@ -76,7 +76,9 @@ html, body {
   height: 100% !important;
   border-radius: var(--radius-lg);
   overflow: hidden;
+  font-size: 14px !important;
 }
+
 .vjs-big-play-button {
   background: var(--accent) !important;
   border: none !important;
@@ -87,13 +89,28 @@ html, body {
   left: 50% !important;
   top: 50% !important;
   transform: translate(-50%, -50%) !important;
-  box-shadow: 0 4px 30px var(--accent-glow) !important;
+  margin: 0 !important;
 }
+
 .vjs-control-bar {
   background: rgba(9,11,16,0.85) !important;
   backdrop-filter: blur(12px) !important;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg) !important;
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
 }
+
+.vjs-control-bar .vjs-control {
+  width: 36px !important;
+  flex-shrink: 0 !important;
+}
+
+.vjs-progress-control {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
 .vjs-play-progress { background: var(--accent) !important; }
 .vjs-load-progress { background: rgba(91,143,255,0.2) !important; }
 .vjs-volume-level { background: var(--accent) !important; }
@@ -174,16 +191,16 @@ html, body {
 /* 8. Кнопка чата поверх плеера */
 .chat-fab {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 56px;
-  height: 56px;
+  bottom: 80px;
+  right: 16px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.7);
+  background: rgba(13,16,23,0.85);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255,255,255,0.1);
   color: white;
-  font-size: 24px;
+  font-size: 22px;
   cursor: pointer;
   z-index: 90;
   display: flex;
