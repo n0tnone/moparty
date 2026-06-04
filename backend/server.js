@@ -255,7 +255,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     room.state = { playing: true, currentTime, updatedAt: Date.now() };
     const nickname = currentUser?.nickname || 'Кто-то';
-    socket.to(roomId).emit('player_play', { currentTime, nickname });
+    io.to(roomId).emit('player_play', { currentTime, nickname, userId: socket.id });
   });
 
   socket.on('player_pause', ({ roomId, currentTime }) => {
@@ -263,7 +263,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     room.state = { playing: false, currentTime, updatedAt: Date.now() };
     const nickname = currentUser?.nickname || 'Кто-то';
-    socket.to(roomId).emit('player_pause', { currentTime, nickname });
+    io.to(roomId).emit('player_pause', { currentTime, nickname, userId: socket.id });
   });
 
   socket.on('player_seek', ({ roomId, currentTime }) => {
@@ -271,31 +271,50 @@ io.on('connection', (socket) => {
     if (!room) return;
     room.state = { ...room.state, currentTime, updatedAt: Date.now() };
     const nickname = currentUser?.nickname || 'Кто-то';
-    socket.to(roomId).emit('player_seek', { currentTime, nickname });
+    io.to(roomId).emit('player_seek', { currentTime, nickname, userId: socket.id });
   });
 
   socket.on('member_time', ({ roomId, currentTime }) => {
     socket.to(roomId).emit('member_time', { userId: socket.id, currentTime })
   })
 
-  // Chat
-  socket.on('chat_message', ({ roomId, text, emoji }) => {
-    const room = rooms[roomId];
-    if (!room || !currentUser) return;
-    if (!text || text.trim().length === 0) return;
+  socket.on('typing_start', ({ roomId }) => {
+    if (!currentUser) return
+    socket.to(roomId).emit('typing_start', { userId: socket.id, nickname: currentUser.nickname })
+  })
 
-    const msg = {
-      id: uuidv4(),
-      type: 'message',
-      userId: socket.id,
-      nickname: currentUser.nickname,
-      text: text.trim().slice(0, 500),
-      emoji: emoji || null,
-      ts: Date.now(),
-    };
-    room.messages.push(msg);
-    if (room.messages.length > 200) room.messages.shift();
-    io.to(roomId).emit('chat_message', msg);
+  socket.on('typing_stop', ({ roomId }) => {
+    socket.to(roomId).emit('typing_stop', { userId: socket.id })
+  })
+
+// Chat
+  socket.on('chat_message', ({ roomId, text, emoji }) => {
+      const room = rooms[roomId];
+      if (!room || !currentUser) {
+        console.log('❌ Chat error: no room or user', { roomId, hasRoom: !!room, hasUser: !!currentUser });
+        return;
+      }
+      if (!text || text.trim().length === 0) {
+        console.log('❌ Chat error: empty text');
+        return;
+      }
+
+      const msg = {
+        id: uuidv4(),
+        type: 'message',
+        userId: socket.id,
+        nickname: currentUser.nickname,
+        text: text.trim().slice(0, 500),
+        emoji: emoji || null,
+        ts: Date.now(),
+      };
+      
+      room.messages.push(msg);
+      if (room.messages.length > 200) room.messages.shift();
+      
+      // ВАЖНО: io.in отправляет ВСЕМ в комнате, включая отправителя
+      io.in(roomId).emit('chat_message', msg);
+      console.log('✅ Message sent to room:', roomId, 'text:', msg.text.substring(0, 30));
   });
 
   socket.on('disconnect', () => {

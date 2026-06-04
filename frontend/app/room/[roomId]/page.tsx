@@ -74,10 +74,16 @@ export default function RoomPage() {
   const [myCurrentTime, setMyCurrentTime] = useState<number>(0)
   const [polinaScreen, setPolinaScreen] = useState(false)
   const [polinaFactIdx, setPolinaFactIdx] = useState(0)
-
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({}) // id -> nickname
+  const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const [isMobile, setIsMobile] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const messagesRef = useRef<Message[]>([])
+  const [toasts, setToasts] = useState<Array<{id: string; text: string; type: 'action'|'chat'; nickname?: string}>>([])
+  const toastTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
 
   const handleChatOpen = (val: boolean) => {
     chatOpenRef.current = val
@@ -92,6 +98,13 @@ export default function RoomPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   // Scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -100,7 +113,6 @@ export default function RoomPage() {
 
   // Socket setup after nickname
   useEffect(() => {
-    
     if (!nicknameSet) return
 
     const s = io(BACKEND, { transports: ['websocket', 'polling'] })
@@ -116,7 +128,10 @@ export default function RoomPage() {
     s.on('room_state', (data: any) => {
       if (data.videoSrc) setVideoUrl(data.videoSrc)
       if (data.members) setMembers(data.members)
-      if (data.messages) setMessages(data.messages)
+      if (data.messages) {
+        setMessages(data.messages)
+        messagesRef.current = data.messages // синхронизируем ref
+      }
     })
 
     s.on('member_time', ({ userId, currentTime }: { userId: string; currentTime: number }) => {
@@ -125,11 +140,60 @@ export default function RoomPage() {
 
     s.on('members_update', (m: Member[]) => setMembers(m))
 
+    s.on('player_play', ({ nickname, userId }: any) => {
+      if (userId === s.id) return // не показываем себе
+      addToast({ id: Date.now() + 'play', text: `▶ ${nickname} запустил видео`, type: 'action' }, 3000)
+    })
+
+    s.on('player_pause', ({ nickname, userId }: any) => {
+      if (userId === s.id) return
+      addToast({ id: Date.now() + 'pause', text: `⏸ ${nickname} поставил на паузу`, type: 'action' }, 3000)
+    })
+
+    s.on('player_seek', ({ nickname, userId }: any) => {
+      if (userId === s.id) return
+      addToast({ id: Date.now() + 'seek', text: `⏩ ${nickname} перемотал`, type: 'action' }, 3000)
+    })
+
     s.on('chat_message', (msg: Message) => {
-      setMessages(prev => [...prev, msg])
+      console.log('📨 Message received:', msg.type, msg.text?.substring(0, 20))
+      
+      // ВСЕГДА добавляем сообщение в чат, независимо от типа
+      setMessages(prevMessages => {
+        // Проверяем, нет ли уже такого сообщения (защита от дублей)
+        if (prevMessages.some(m => m.id === msg.id)) {
+          console.log('⚠️ Duplicate message prevented')
+          return prevMessages
+        }
+        
+        const newMessages = [...prevMessages, msg]
+        if (newMessages.length > 200) newMessages.shift()
+        messagesRef.current = newMessages
+        console.log('✅ Messages count:', newMessages.length)
+        return newMessages
+      })
+      
+      // Звук и счётчик только для чужих сообщений
       if (msg.type === 'message' && msg.userId !== s.id) {
         playNotify()
-        if (!chatOpenRef.current) setUnread(u => u + 1)
+        
+        if (!chatOpenRef.current) {
+          setUnread(u => u + 1)
+        }
+        
+        if (isMobile && 'vibrate' in navigator) {
+          navigator.vibrate?.(100)
+        }
+      }
+
+      if (msg.type === 'message' && msg.userId !== s.id) {
+        const duration = Math.min(2000 + msg.text.length * 40, 5000)
+        addToast({
+          id: 'chat_' + msg.id,
+          text: msg.text,
+          type: 'chat',
+          nickname: msg.nickname,
+        }, duration)
       }
     })
 
@@ -139,11 +203,23 @@ export default function RoomPage() {
 
     s.on('disconnect', () => {
       setConnected(false)
-      // авто-реконнект socket.io делает сам, но нужно переджойнить комнату
     })
 
     s.on('reconnect', () => {
       s.emit('join_room', { roomId, nickname })
+    })
+
+    s.on('typing_start', ({ userId, nickname }: { userId: string; nickname: string }) => {
+      setTypingUsers(prev => ({ ...prev, [userId]: nickname }))
+      clearTimeout(typingTimers.current[userId])
+      typingTimers.current[userId] = setTimeout(() => {
+        setTypingUsers(prev => { const n = { ...prev }; delete n[userId]; return n })
+      }, 3000)
+    })
+
+    s.on('typing_stop', ({ userId }: { userId: string }) => {
+      clearTimeout(typingTimers.current[userId])
+      setTypingUsers(prev => { const n = { ...prev }; delete n[userId]; return n })
     })
 
     const timeInterval = setInterval(() => {
@@ -161,14 +237,34 @@ export default function RoomPage() {
     }
   }, [nicknameSet, roomId, nickname])
 
+  const addToast = (toast: {id: string; text: string; type: 'action'|'chat'; nickname?: string}, duration: number) => {
+    setToasts(prev => [...prev, toast]) // просто добавляем, не заменяем
+    toastTimers.current[toast.id] = setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== toast.id))
+      delete toastTimers.current[toast.id]
+    }, duration)
+  }
+
   const sendChat = () => {
     if (!chatInput.trim()) return
     const s = socketRef.current
     if (!s?.connected) return
     s.emit('chat_message', { roomId, text: chatInput.trim() })
+    s.emit('typing_stop', { roomId })
     setChatInput('')
     setShowEmoji(false)
     chatInputRef.current?.focus()
+  }
+
+  const handleChatInput = (val: string) => {
+    setChatInput(val)
+    const s = socketRef.current
+    if (!s?.connected) return
+    if (val.trim()) {
+      s.emit('typing_start', { roomId })
+    } else {
+      s.emit('typing_stop', { roomId })
+    }
   }
 
   const addEmoji = (e: string) => {
@@ -592,7 +688,7 @@ export default function RoomPage() {
             <ChatPanel
               messages={messages}
               chatInput={chatInput}
-              setChatInput={setChatInput}
+              onInputChange={setChatInput}
               sendChat={sendChat}
               showEmoji={showEmoji}
               setShowEmoji={setShowEmoji}
@@ -601,6 +697,7 @@ export default function RoomPage() {
               chatEndRef={chatEndRef}
               myId={mySocketId}
               EMOJIS={EMOJIS}
+              typingUsers={typingUsers}
             />
           </div>
         </div>
@@ -673,7 +770,7 @@ export default function RoomPage() {
               <ChatPanel
                 messages={messages}
                 chatInput={chatInput}
-                setChatInput={setChatInput}
+                onInputChange={setChatInput}
                 sendChat={sendChat}
                 showEmoji={showEmoji}
                 setShowEmoji={setShowEmoji}
@@ -776,13 +873,13 @@ export default function RoomPage() {
           </div>
         </div>
       )}
-      <PlayerToast socket={socket} mySocketId={mySocketId} />
+      <PlayerToast toasts={toasts} chatOpen={chatOpen} />
     </div>
   )
 }
 
 // ---- ChatPanel component (ИСПРАВЛЕННЫЙ) ----
-function ChatPanel({ messages, chatInput, setChatInput, sendChat, showEmoji, setShowEmoji, addEmoji, chatInputRef, chatEndRef, myId, EMOJIS }: any) {
+function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, setShowEmoji, addEmoji, chatInputRef, chatEndRef, myId, EMOJIS, typingUsers = {}}: any) {
   return (
     <div style={{
       display: 'flex',
@@ -872,6 +969,18 @@ function ChatPanel({ messages, chatInput, setChatInput, sendChat, showEmoji, set
         </div>
       )}
 
+      {Object.keys(typingUsers).length > 0 && (
+        <div style={{
+          padding: '4px 16px',
+          fontSize: 12,
+          color: 'var(--text-muted)',
+          fontStyle: 'italic',
+          flexShrink: 0,
+        }}>
+          {Object.values(typingUsers).join(', ')} печатает...
+        </div>
+      )}
+
       {/* Input area */}
       <div style={{
         padding: '12px',
@@ -894,7 +1003,7 @@ function ChatPanel({ messages, chatInput, setChatInput, sendChat, showEmoji, set
         <input
           ref={chatInputRef}
           value={chatInput}
-          onChange={e => setChatInput(e.target.value)}
+          onChange={e => onInputChange(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && sendChat()}
           placeholder="Сообщение..."
           maxLength={500}

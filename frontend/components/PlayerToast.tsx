@@ -1,7 +1,6 @@
-// components/PlayerToast.tsx
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Toast {
   id: string
@@ -11,66 +10,16 @@ interface Toast {
 }
 
 interface Props {
-  socket: any
-  mySocketId: string
+  toasts: Toast[]
 }
 
-export default function PlayerToast({ socket, mySocketId }: Props) {
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const timerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-
-  const addToast = (toast: Toast, duration: number) => {
-    setToasts(prev => [...prev.slice(-2), toast]) // максимум 3
-    timerRef.current[toast.id] = setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== toast.id))
-      delete timerRef.current[toast.id]
-    }, duration)
-  }
-
-  useEffect(() => {
-    if (!socket) return
-
-    socket.on('player_play', ({ currentTime, nickname }: any) => {
-      if (!nickname) return
-      addToast({ id: Date.now()+'play', text: `▶ ${nickname} запустил видео`, type: 'action' }, 3000)
-    })
-
-    socket.on('player_pause', ({ currentTime, nickname }: any) => {
-      if (!nickname) return
-      addToast({ id: Date.now()+'pause', text: `⏸ ${nickname} поставил на паузу`, type: 'action' }, 3000)
-    })
-
-    socket.on('player_seek', ({ currentTime, nickname }: any) => {
-      if (!nickname) return
-      addToast({ id: Date.now()+'seek', text: `⏩ ${nickname} перемотал`, type: 'action' }, 3000)
-    })
-
-    socket.on('chat_message', (msg: any) => {
-      if (msg.type !== 'message') return
-      if (msg.userId === mySocketId) return
-      const duration = Math.min(2000 + msg.text.length * 40, 5000)
-      addToast({
-        id: msg.id,
-        text: msg.text,
-        type: 'chat',
-        nickname: msg.nickname,
-      }, duration)
-    })
-
-    return () => {
-      socket.off('player_play')
-      socket.off('player_pause')
-      socket.off('player_seek')
-      socket.off('chat_message')
-    }
-  }, [socket, mySocketId])
-
-  if (toasts.length === 0) return null
+export default function PlayerToast({ toasts, chatOpen }: { toasts: Toast[], chatOpen: boolean }) {
+  if (toasts.length === 0 || chatOpen) return null
 
   return (
     <div style={{
       position: 'fixed',
-      bottom: 80,
+      bottom: 90,
       left: 16,
       zIndex: 9999,
       display: 'flex',
