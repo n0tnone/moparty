@@ -20,7 +20,7 @@ export default function PlayerToast({ toasts, chatOpen }: { toasts: Toast[], cha
     <div style={{
       position: 'fixed',
       bottom: 90,
-      left: 16,
+      left: 36,
       zIndex: 9999,
       display: 'flex',
       flexDirection: 'column',

@@ -86,6 +86,7 @@ export default function RoomPage() {
   const chatScrollRef = useRef<HTMLDivElement>(null)
   const [toasts, setToasts] = useState<Array<{id: string; text: string; type: 'action'|'chat'; nickname?: string}>>([])
   const toastTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const [initialTime, setInitialTime] = useState(0)
 
 
   const handleChatOpen = (val: boolean) => {
@@ -130,6 +131,7 @@ export default function RoomPage() {
 
     s.on('room_state', (data: any) => {
       if (data.videoSrc) setVideoUrl(data.videoSrc)
+      if (data.state?.currentTime > 0) setInitialTime(data.state.currentTime)
       if (data.members) setMembers(data.members)
       if (data.messages) {
         setMessages(data.messages)
@@ -146,17 +148,17 @@ export default function RoomPage() {
 
     s.on('player_play', ({ nickname, userId }: any) => {
       if (userId === s.id) return
-      addToast({ id: `play_${Date.now()}_${Math.random()}`, text: `▶ ${nickname} запустил видео`, type: 'action' }, 3000)
+      addToast({ id: 'play', text: `▶ ${nickname} запустил видео`, type: 'action' }, 3000)
     })
 
     s.on('player_pause', ({ nickname, userId }: any) => {
       if (userId === s.id) return
-      addToast({ id: `pause_${Date.now()}_${Math.random()}`, text: `⏸ ${nickname} поставил на паузу`, type: 'action' }, 3000)
+      addToast({ id: 'pause', text: `⏸ ${nickname} поставил на паузу`, type: 'action' }, 3000)
     })
 
     s.on('player_seek', ({ nickname, userId }: any) => {
       if (userId === s.id) return
-      addToast({ id: `seek_${Date.now()}_${Math.random()}`, text: `⏩ ${nickname} перемотал`, type: 'action' }, 3000)
+      addToast({ id: 'seek', text: `⏩ ${nickname} перемотал`, type: 'action' }, 3000)
     })
 
     s.on('chat_message', (msg: Message) => {
@@ -192,12 +194,7 @@ export default function RoomPage() {
 
       if (msg.type === 'message' && msg.userId !== s.id) {
         const duration = Math.min(2000 + msg.text.length * 40, 5000)
-        addToast({
-          id: `chat_${msg.id}_${Math.random()}`,
-          text: msg.text,
-          type: 'chat',
-          nickname: msg.nickname,
-        }, duration)
+        addToast({ id: 'chat', text: msg.text, type: 'chat', nickname: msg.nickname }, duration)
       }
     })
 
@@ -241,11 +238,29 @@ export default function RoomPage() {
     }
   }, [nicknameSet, roomId, nickname])
 
+  const toastCounter = useRef(0)
+
   const addToast = (toast: {id: string; text: string; type: 'action'|'chat'; nickname?: string}, duration: number) => {
-    setToasts(prev => [...prev, toast]) // просто добавляем, не заменяем
-    toastTimers.current[toast.id] = setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== toast.id))
-      delete toastTimers.current[toast.id]
+    const uniqueId = toast.type === 'action' 
+      ? toast.id  // для экшнов используем фиксированный id (play/pause/seek)
+      : `${toast.id}_${++toastCounter.current}`  // для чата всегда новый
+    
+    const t = { ...toast, id: uniqueId }
+    
+    // Отменяем предыдущий таймер если есть
+    if (toastTimers.current[uniqueId]) {
+      clearTimeout(toastTimers.current[uniqueId])
+    }
+    
+    // Заменяем или добавляем
+    setToasts(prev => {
+      const filtered = prev.filter(x => x.id !== uniqueId)
+      return [...filtered, t]
+    })
+    
+    toastTimers.current[uniqueId] = setTimeout(() => {
+      setToasts(prev => prev.filter(x => x.id !== uniqueId))
+      delete toastTimers.current[uniqueId]
     }, duration)
   }
 
@@ -620,11 +635,55 @@ export default function RoomPage() {
             border: '1px solid var(--glass-border)',
             position: 'relative',
           }}>
+            {/* Кнопка чата поверх плеера */}
+            <button
+              onClick={() => handleChatOpen(true)}
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 20,
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                background: 'rgba(13,16,23,0.55)',
+                backdropFilter: 'blur(16px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: 'white',
+                fontSize: 20,
+                cursor: 'pointer',
+                display: isMobile ? 'flex' : 'none',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              💬
+              {unread > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: -4, right: -4,
+                  width: 18, height: 18,
+                  borderRadius: '50%',
+                  background: '#f87171',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid var(--bg-base)',
+                  pointerEvents: 'none',
+                }}>{unread > 9 ? '9+' : unread}</div>
+              )}
+            </button>
+
             {videoUrl ? (
               <VideoPlayer
                 src={videoUrl}
                 socket={socket}
                 roomId={roomId}
+                initialTime={initialTime}
               />
             ) : (
               <div style={{
@@ -716,29 +775,6 @@ export default function RoomPage() {
           </div>
         </div>
       </div>
-
-      {/* Mobile chat FAB button */}
-      <button
-        className="chat-fab"
-        onClick={() => handleChatOpen(true)}
-      >
-        💬
-        {unread > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: -4, right: -4,
-            width: 20, height: 20,
-            borderRadius: '50%',
-            background: '#f87171',
-            fontSize: 11,
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid var(--bg-base)',
-          }}>{unread > 9 ? '9+' : unread}</div>
-        )}
-      </button>
 
       {/* Mobile chat overlay */}
       {chatOpen && (

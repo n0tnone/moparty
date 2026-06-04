@@ -187,19 +187,19 @@ html, body {
   z-index: 100;
 }
 
-/* 8. Кнопка чата поверх плеера */
 .chat-fab {
   position: fixed;
-  bottom: 80px;
-  right: 16px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(13,16,23,0.85);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.1);
+  top: 70px; /* под хедером */
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px; /* квадратиш */
+  background: rgba(13,16,23,0.45);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.08);
   color: white;
-  font-size: 22px;
+  font-size: 20px;
   cursor: pointer;
   z-index: 90;
   display: flex;
@@ -209,8 +209,8 @@ html, body {
 }
 
 .chat-fab:hover {
-  background: var(--accent);
-  transform: scale(1.05);
+  background: rgba(13,16,23,0.7);
+  border-color: rgba(255,255,255,0.15);
 }
 
 /* 9. Скрываем десктопный чат на мобилках */

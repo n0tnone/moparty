@@ -267,7 +267,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     room.state = { playing: true, currentTime, updatedAt: Date.now() };
     const nickname = currentUser?.nickname || 'Кто-то';
-    io.to(roomId).emit('player_play', { currentTime, nickname, userId: socket.id });
+    socket.to(roomId).emit('player_play', { currentTime, nickname, userId: socket.id })
   });
 
   socket.on('player_pause', ({ roomId, currentTime }) => {
@@ -275,7 +275,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     room.state = { playing: false, currentTime, updatedAt: Date.now() };
     const nickname = currentUser?.nickname || 'Кто-то';
-    io.to(roomId).emit('player_pause', { currentTime, nickname, userId: socket.id });
+    socket.to(roomId).emit('player_pause', { currentTime, nickname, userId: socket.id });
   });
 
   socket.on('player_seek', ({ roomId, currentTime }) => {
@@ -283,7 +283,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     room.state = { ...room.state, currentTime, updatedAt: Date.now() };
     const nickname = currentUser?.nickname || 'Кто-то';
-    io.to(roomId).emit('player_seek', { currentTime, nickname, userId: socket.id });
+    socket.to(roomId).emit('player_seek', { currentTime, nickname, userId: socket.id });
   });
 
   socket.on('member_time', ({ roomId, currentTime }) => {
