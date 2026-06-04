@@ -37,7 +37,7 @@ export default function PlayerToast({ toasts, chatOpen }: { toasts: Toast[], cha
             borderRadius: 12,
             padding: toast.type === 'chat' ? '8px 14px' : '7px 14px',
             maxWidth: 260,
-            animation: 'toastIn 0.25s cubic-bezier(0.2,0.9,0.4,1.1) both',
+            animation: 'toastIn 0.3s cubic-bezier(0.2,0.9,0.4,1.1) both',
           }}
         >
           {toast.type === 'chat' && toast.nickname && (

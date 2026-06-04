@@ -735,7 +735,10 @@ export default function RoomPage() {
             </div>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {members.map(m => (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div key={m.id} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 10, marginBottom: 10 }}>
                   <UserAvatar name={m.nickname} size={32} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -783,6 +786,7 @@ export default function RoomPage() {
             position: 'fixed', inset: 0, zIndex: 100,
             background: 'rgba(9,11,16,0.8)',
             backdropFilter: 'blur(8px)',
+            animation: 'fadeInOverlay 0.25s ease both',
           }}
           onClick={() => handleChatOpen(false)}
         >
@@ -796,6 +800,7 @@ export default function RoomPage() {
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
+              animation: 'slideUpSheet 0.35s cubic-bezier(0.2,0.9,0.4,1.1) both',
             }}
             onClick={e => e.stopPropagation()}
           >
@@ -860,6 +865,7 @@ export default function RoomPage() {
               padding: 32,
               maxWidth: 440,
               width: '100%',
+              animation: 'modalIn 0.3s cubic-bezier(0.2,0.9,0.4,1.1) both',
             }}
             onClick={e => e.stopPropagation()}
           >
@@ -975,43 +981,68 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
           </div>
         )}
 
-        {messages.map((msg: Message) =>
-          msg.type === 'system' ? (
-            <div key={msg.id} style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', padding: '4px 0' }}>
-              {msg.text}
-            </div>
-          ) : (
-            <div
-              key={msg.id}
-              data-msg-id={msg.id}
-              style={{
-                display: 'flex',
-                flexDirection: msg.userId === myId ? 'row-reverse' : 'row',
-                gap: 8, alignItems: 'flex-end', marginBottom: 2,
-              }}
-            >
-              <div style={{ borderRadius: 6, overflow: 'hidden', flexShrink: 0, width: 26, height: 26 }}>
-                <UserAvatar name={msg.nickname || '?'} size={26} />
-              </div>
-              <div style={{ maxWidth: '75%' }}>
-                {msg.userId !== myId && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3, paddingLeft: 2 }}>
-                    {msg.nickname}
-                  </div>
-                )}
-              <div style={{
-                padding: '8px 12px',
-                borderRadius: msg.userId === myId ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                background: msg.userId === myId ? 'var(--accent-dim)' : 'rgba(255,255,255,0.06)',
-                border: `1px solid ${msg.userId === myId ? 'rgba(91,143,255,0.2)' : 'var(--glass-border)'}`,
-                fontSize: 14, lineHeight: 1.4, wordBreak: 'break-word',
-              }}>
-                {msg.text}
-              </div>
-              </div>
-            </div>
-          )
+{messages.map((msg: Message) =>
+  msg.type === 'system' ? (
+    <div key={msg.id} style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', padding: '4px 0' }}>
+      {msg.text}
+    </div>
+  ) : (
+    <div
+      key={msg.id}
+      style={{
+        display: 'flex',
+        flexDirection: msg.userId === myId ? 'row-reverse' : 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 6,
+        animation: 'msgIn 0.25s cubic-bezier(0.2,0.9,0.4,1.1) both',
+      }}
+    >
+      {/* Аватарка только для чужих */}
+      {msg.userId !== myId && (
+        <div style={{ flexShrink: 0, borderRadius: 8, overflow: 'hidden', width: 28, height: 28, marginBottom: 2 }}>
+          <UserAvatar name={msg.nickname || '?'} size={28} />
+        </div>
+      )}
+
+      <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column', alignItems: msg.userId === myId ? 'flex-end' : 'flex-start' }}>
+        {/* Никнейм сверху только для чужих */}
+        {msg.userId !== myId && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3, paddingLeft: 4 }}>
+            {msg.nickname}
+          </div>
         )}
+
+        <div style={{
+          padding: '8px 12px',
+          borderRadius: msg.userId === myId
+            ? '16px 4px 16px 16px'
+            : '4px 16px 16px 16px',
+          background: msg.userId === myId
+            ? 'var(--accent)'
+            : 'rgba(255,255,255,0.07)',
+          border: msg.userId === myId
+            ? 'none'
+            : '1px solid rgba(255,255,255,0.06)',
+          fontSize: 14,
+          lineHeight: 1.45,
+          wordBreak: 'break-word',
+          color: 'var(--text-primary)',
+          boxShadow: msg.userId === myId
+            ? '0 2px 12px rgba(91,143,255,0.25)'
+            : 'none',
+        }}>
+          {msg.text}
+        </div>
+
+        {/* Время */}
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>
+          {new Date(msg.ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      </div>
+    </div>
+  )
+)}
         <div ref={chatEndRef} />
       </div>
 
