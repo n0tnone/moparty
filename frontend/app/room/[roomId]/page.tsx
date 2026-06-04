@@ -6,6 +6,7 @@ import io, { Socket } from 'socket.io-client'
 import dynamic from 'next/dynamic'
 import UserAvatar from '@/components/Avatar'
 import { playNotify } from '@/lib/notify'
+import PlayerToast from '@/components/PlayerToast'
 
 const VideoPlayer = dynamic(() => import('@/components/VideoPlayer'), { ssr: false })
 
@@ -775,6 +776,7 @@ export default function RoomPage() {
           </div>
         </div>
       )}
+      <PlayerToast socket={socket} mySocketId={mySocketId} />
     </div>
   )
 }
@@ -923,6 +925,7 @@ function ChatPanel({ messages, chatInput, setChatInput, sendChat, showEmoji, set
           }}
         >➤</button>
       </div>
+      
     </div>
   )
 }

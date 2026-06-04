@@ -254,21 +254,24 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (!room) return;
     room.state = { playing: true, currentTime, updatedAt: Date.now() };
-    socket.to(roomId).emit('player_play', { currentTime });
+    const nickname = currentUser?.nickname || 'Кто-то';
+    socket.to(roomId).emit('player_play', { currentTime, nickname });
   });
 
   socket.on('player_pause', ({ roomId, currentTime }) => {
     const room = rooms[roomId];
     if (!room) return;
     room.state = { playing: false, currentTime, updatedAt: Date.now() };
-    socket.to(roomId).emit('player_pause', { currentTime });
+    const nickname = currentUser?.nickname || 'Кто-то';
+    socket.to(roomId).emit('player_pause', { currentTime, nickname });
   });
 
   socket.on('player_seek', ({ roomId, currentTime }) => {
     const room = rooms[roomId];
     if (!room) return;
     room.state = { ...room.state, currentTime, updatedAt: Date.now() };
-    socket.to(roomId).emit('player_seek', { currentTime });
+    const nickname = currentUser?.nickname || 'Кто-то';
+    socket.to(roomId).emit('player_seek', { currentTime, nickname });
   });
 
   socket.on('member_time', ({ roomId, currentTime }) => {
