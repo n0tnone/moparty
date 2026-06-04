@@ -63,7 +63,7 @@ export default function VideoPlayer({ src, socket, roomId, initialTime = 0 }: Pr
         const videojs = vjsModule.default
         await import('video.js/dist/video-js.css')
 
-        if (!videoRef.current) return
+        if (!videoRef.current || !document.body.contains(videoRef.current)) return
 
         const player = videojs(videoRef.current, {
           controls: false,

@@ -87,6 +87,7 @@ export default function RoomPage() {
   const [toasts, setToasts] = useState<Array<{id: string; text: string; type: 'action'|'chat'; nickname?: string}>>([])
   const toastTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [initialTime, setInitialTime] = useState(0)
+  const isLoadingMoreRef = useRef(false)
 
 
   const handleChatOpen = (val: boolean) => {
@@ -111,6 +112,10 @@ export default function RoomPage() {
 
   // Scroll chat to bottom
   useEffect(() => {
+    if (isLoadingMoreRef.current) {
+      isLoadingMoreRef.current = false
+      return 
+    }
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     if (chatOpen) setUnread(0)
   }, [messages, chatOpen])
@@ -130,6 +135,7 @@ export default function RoomPage() {
     })
 
     s.on('room_state', (data: any) => {
+      console.log('totalMessages:', data.totalMessages, 'messages.length:', data.messages?.length)
       if (data.videoSrc) setVideoUrl(data.videoSrc)
       if (data.state?.currentTime > 0) setInitialTime(data.state.currentTime)
       if (data.members) setMembers(data.members)
@@ -223,6 +229,13 @@ export default function RoomPage() {
       setTypingUsers(prev => { const n = { ...prev }; delete n[userId]; return n })
     })
 
+    s.on('more_messages', ({ messages: older, hasMore }: { messages: Message[], hasMore: boolean }) => {
+      setMessages(prev => [...older, ...prev])
+      messagesRef.current = [...older, ...messagesRef.current]
+      setHasMoreMessages(hasMore)
+      setLoadingMore(false)
+    })
+
     const timeInterval = setInterval(() => {
       const p = (window as any).__mopartyPlayer
       if (p) {
@@ -239,6 +252,7 @@ export default function RoomPage() {
   }, [nicknameSet, roomId, nickname])
 
   const toastCounter = useRef(0)
+  
 
   const addToast = (toast: {id: string; text: string; type: 'action'|'chat'; nickname?: string}, duration: number) => {
     const uniqueId = toast.type === 'action' 
@@ -311,6 +325,7 @@ export default function RoomPage() {
 
   const loadMoreMessages = () => {
     if (loadingMore || !hasMoreMessages || !messages.length) return
+    isLoadingMoreRef.current = true 
     setLoadingMore(true)
     socketRef.current?.emit('load_more_messages', { roomId, beforeId: messages[0].id })
   }
@@ -774,6 +789,7 @@ export default function RoomPage() {
               loadingMore={loadingMore}
               onLoadMore={loadMoreMessages}
               chatScrollRef={chatScrollRef}
+              myNickname={nickname}
             />
           </div>
         </div>
@@ -838,6 +854,7 @@ export default function RoomPage() {
                 loadingMore={loadingMore}
                 onLoadMore={loadMoreMessages}
                 chatScrollRef={chatScrollRef}
+                myNickname={nickname}
               />
             </div>
           </div>
@@ -938,18 +955,16 @@ export default function RoomPage() {
   )
 }
 
-// ---- ChatPanel component (ИСПРАВЛЕННЫЙ) ----
-function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, setShowEmoji, addEmoji, chatInputRef, chatEndRef, myId, EMOJIS, typingUsers = {}, hasMoreMessages, loadingMore, onLoadMore, chatScrollRef }: any) {
+function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, setShowEmoji, addEmoji, chatInputRef, chatEndRef, myId, EMOJIS, typingUsers = {}, hasMoreMessages, loadingMore, onLoadMore, chatScrollRef, myNickname }: any) {
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (e.currentTarget.scrollTop < 50 && !loadingMore) {
+    const el = e.currentTarget
+    if (el.scrollTop < 50 && !loadingMore && hasMoreMessages) {
       onLoadMore?.()
     }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-
-      {/* Messages */}
       <div
         ref={chatScrollRef}
         className="chat-messages-container"
@@ -959,7 +974,6 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
           display: 'flex', flexDirection: 'column', gap: 4, minHeight: 0,
         }}
       >
-        {/* Кнопка загрузить ещё */}
         {hasMoreMessages && (
           <div style={{ textAlign: 'center', padding: '4px 0 8px' }}>
             {loadingMore ? (
@@ -968,9 +982,7 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
               <button onClick={onLoadMore} style={{
                 fontSize: 12, color: 'var(--accent)',
                 background: 'none', border: 'none', cursor: 'pointer', padding: '4px 12px',
-              }}>
-                ↑ Загрузить ещё
-              </button>
+              }}>↑ Загрузить ещё</button>
             )}
           </div>
         )}
@@ -981,72 +993,96 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
           </div>
         )}
 
-{messages.map((msg: Message) =>
-  msg.type === 'system' ? (
-    <div key={msg.id} style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', padding: '4px 0' }}>
-      {msg.text}
-    </div>
-  ) : (
-    <div
-      key={msg.id}
-      style={{
-        display: 'flex',
-        flexDirection: msg.userId === myId ? 'row-reverse' : 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 6,
-        animation: 'msgIn 0.25s cubic-bezier(0.2,0.9,0.4,1.1) both',
-      }}
-    >
-      {/* Аватарка только для чужих */}
-      {msg.userId !== myId && (
-        <div style={{ flexShrink: 0, borderRadius: 8, overflow: 'hidden', width: 28, height: 28, marginBottom: 2 }}>
-          <UserAvatar name={msg.nickname || '?'} size={28} />
-        </div>
-      )}
+        {messages.map((msg: Message) =>
+          msg.type === 'system' ? (
+            <div key={msg.id} style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', padding: '4px 0' }}>
+              {msg.text}
+            </div>
+          ) : (
+            (() => {
+              const isMyMsg = msg.userId === myId
+              const isPolinaMsg = isPolina(msg.nickname || '')
+              const isMyPolinaMsg = isMyMsg && isPolina(myNickname || '')
+              const isPink = isPolinaMsg || isMyPolinaMsg
 
-      <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column', alignItems: msg.userId === myId ? 'flex-end' : 'flex-start' }}>
-        {/* Никнейм сверху только для чужих */}
-        {msg.userId !== myId && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3, paddingLeft: 4 }}>
-            {msg.nickname}
-          </div>
+              return (
+                <div
+                  key={msg.id}
+                  style={{
+                    display: 'flex',
+                    flexDirection: isMyMsg ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginBottom: 6,
+                    animation: 'msgIn 0.25s cubic-bezier(0.2,0.9,0.4,1.1) both',
+                  }}
+                >
+                  {!isMyMsg && (
+                    <div style={{ flexShrink: 0, borderRadius: 8, overflow: 'hidden', width: 28, height: 28 }}>
+                      <UserAvatar name={msg.nickname || '?'} size={28} />
+                    </div>
+                  )}
+
+                  <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column', alignItems: isMyMsg ? 'flex-end' : 'flex-start' }}>
+                    {!isMyMsg && (
+                      <div style={{ fontSize: 11, color: isPolinaMsg ? 'rgba(236,72,153,0.8)' : 'var(--text-muted)', marginBottom: 3, paddingLeft: 4 }}>
+                        {msg.nickname}
+                      </div>
+                    )}
+
+                    <div style={{
+                      padding: '8px 12px',
+                      borderRadius: isMyMsg ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
+                      background: isMyMsg
+                        ? isMyPolinaMsg
+                          ? 'linear-gradient(135deg, rgba(236,72,153,0.6), rgba(192,132,252,0.5))'
+                          : 'var(--accent)'
+                        : isPolinaMsg
+                          ? 'linear-gradient(135deg, rgba(236,72,153,0.25), rgba(192,132,252,0.2))'
+                          : 'rgba(255,255,255,0.07)',
+                      border: isMyMsg
+                        ? isMyPolinaMsg ? '1px solid rgba(236,72,153,0.4)' : 'none'
+                        : isPolinaMsg
+                          ? '1px solid rgba(236,72,153,0.3)'
+                          : '1px solid rgba(255,255,255,0.06)',
+                      fontSize: 14,
+                      lineHeight: 1.45,
+                      wordBreak: 'break-word',
+                      color: 'var(--text-primary)',
+                      boxShadow: isMyMsg
+                        ? isMyPolinaMsg
+                          ? '0 2px 16px rgba(236,72,153,0.35)'
+                          : '0 2px 12px rgba(91,143,255,0.25)'
+                        : isPolinaMsg
+                          ? '0 2px 12px rgba(236,72,153,0.15)'
+                          : 'none',
+                      position: 'relative' as const,
+                      overflow: 'hidden',
+                    }}>
+                      {isPink && (
+                        <div style={{
+                          position: 'absolute', inset: 0,
+                          background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%)',
+                          backgroundSize: '200% 100%',
+                          animation: 'shimmerPolina 3s linear infinite',
+                          pointerEvents: 'none',
+                        }} />
+                      )}
+                      {msg.text}
+                    </div>
+
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>
+                      {new Date(msg.ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()
+          )
         )}
-
-        <div style={{
-          padding: '8px 12px',
-          borderRadius: msg.userId === myId
-            ? '16px 4px 16px 16px'
-            : '4px 16px 16px 16px',
-          background: msg.userId === myId
-            ? 'var(--accent)'
-            : 'rgba(255,255,255,0.07)',
-          border: msg.userId === myId
-            ? 'none'
-            : '1px solid rgba(255,255,255,0.06)',
-          fontSize: 14,
-          lineHeight: 1.45,
-          wordBreak: 'break-word',
-          color: 'var(--text-primary)',
-          boxShadow: msg.userId === myId
-            ? '0 2px 12px rgba(91,143,255,0.25)'
-            : 'none',
-        }}>
-          {msg.text}
-        </div>
-
-        {/* Время */}
-        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>
-          {new Date(msg.ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}
-        </div>
-      </div>
-    </div>
-  )
-)}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Emoji picker */}
       {showEmoji && (
         <div style={{
           padding: '8px 12px', borderTop: '1px solid var(--glass-border)',
@@ -1057,21 +1093,17 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
               background: 'none', border: 'none', fontSize: 22,
               cursor: 'pointer', padding: '4px 6px', borderRadius: 8,
               minWidth: 44, minHeight: 44,
-            }}>
-              {e}
-            </button>
+            }}>{e}</button>
           ))}
         </div>
       )}
 
-      {/* Typing indicator */}
       {Object.keys(typingUsers).length > 0 && (
         <div style={{ padding: '4px 16px', fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', flexShrink: 0 }}>
           {Object.values(typingUsers).join(', ')} печатает...
         </div>
       )}
 
-      {/* Input */}
       <div style={{
         padding: '12px', borderTop: '1px solid var(--glass-border)',
         display: 'flex', gap: 8, alignItems: 'flex-end', flexShrink: 0,
@@ -1104,7 +1136,6 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
           cursor: chatInput.trim() ? 'pointer' : 'not-allowed', flexShrink: 0,
         }}>➤</button>
       </div>
-
     </div>
   )
 }
