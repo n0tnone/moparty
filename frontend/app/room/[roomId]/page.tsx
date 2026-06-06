@@ -88,12 +88,27 @@ export default function RoomPage() {
   const toastTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [initialTime, setInitialTime] = useState(0)
   const isLoadingMoreRef = useRef(false)
-
+  const mobileChatScrollRef = useRef<HTMLDivElement>(null)
+  const mobileChatEndRef = useRef<HTMLDivElement>(null)
+  const mobileChatInputRef = useRef<HTMLInputElement>(null)
 
   const handleChatOpen = (val: boolean) => {
     chatOpenRef.current = val
     setChatOpen(val)
-  }
+    if (val) {
+      if (messages.length > 20) {
+        const sliced = messages.slice(-20)
+        setMessages(sliced)
+        messagesRef.current = sliced
+        setHasMoreMessages(true)
+      }
+
+      setTimeout(() => {
+        mobileChatEndRef.current?.scrollIntoView({ behavior: 'instant' })
+      }, 380)
+    }
+  setUnread(0)
+}
 
   useEffect(() => {
     const saved = localStorage.getItem('moparty_nickname')
@@ -117,6 +132,7 @@ export default function RoomPage() {
       return 
     }
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    mobileChatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     if (chatOpen) setUnread(0)
   }, [messages, chatOpen])
 
@@ -229,9 +245,13 @@ export default function RoomPage() {
       setTypingUsers(prev => { const n = { ...prev }; delete n[userId]; return n })
     })
 
-    s.on('more_messages', ({ messages: older, hasMore }: { messages: Message[], hasMore: boolean }) => {
-      setMessages(prev => [...older, ...prev])
-      messagesRef.current = [...older, ...messagesRef.current]
+    s.on('more_messages', ({ messages: older, hasMore }) => {
+      isLoadingMoreRef.current = true
+      setMessages(prev => {
+        const merged = [...older, ...prev]
+        messagesRef.current = merged
+        return merged
+      })
       setHasMoreMessages(hasMore)
       setLoadingMore(false)
     })
@@ -851,6 +871,7 @@ export default function RoomPage() {
                 chatEndRef={chatEndRef}
                 myId={mySocketId}
                 EMOJIS={EMOJIS}
+                typingUsers={typingUsers}
                 hasMoreMessages={hasMoreMessages}
                 loadingMore={loadingMore}
                 onLoadMore={loadMoreMessages}
@@ -981,9 +1002,16 @@ function ChatPanel({ messages, chatInput, onInputChange, sendChat, showEmoji, se
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Загрузка...</span>
             ) : (
               <button onClick={onLoadMore} style={{
-                fontSize: 12, color: 'var(--accent)',
-                background: 'none', border: 'none', cursor: 'pointer', padding: '4px 12px',
-              }}>↑ Загрузить ещё</button>
+                fontSize: 12,
+                color: 'var(--accent)',
+                background: 'rgba(91,143,255,0.08)',
+                border: '1px solid rgba(91,143,255,0.2)',
+                borderRadius: 100,
+                cursor: 'pointer',
+                padding: '5px 16px',
+                fontWeight: 600,
+                transition: 'all 0.2s',
+              }}>Загрузить ещё</button>
             )}
           </div>
         )}
