@@ -66,7 +66,7 @@ export default function LoginPage() {
   console.log('exchangeCode:', data)
 
   // SDK сам делает запрос к VK с нужным origin
-  const userInfo = await VKID.Auth.getUserInfo(data.access_token)
+  const userInfo = await VKID.Auth.userInfo(data.access_token)
   console.log('userInfo:', userInfo)
 
   const user = userInfo?.user
