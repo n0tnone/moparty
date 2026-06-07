@@ -58,44 +58,41 @@ export default function LoginPage() {
       .on(VKID.WidgetEvents.ERROR, (error: any) => {
         console.error('[VK] WidgetEvents.ERROR:', error)
       })
-    .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload: any) => {
-    const { code, device_id } = payload
+.on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload: any) => {
+  const { code, device_id } = payload
 
-    const data = await VKID.Auth.exchangeCode(code, device_id)
+  const data = await VKID.Auth.exchangeCode(code, device_id)
+  console.log('exchangeCode:', data)
 
-    // Получаем профиль прямо на клиенте (токен привязан к IP клиента)
-    const vkRes = await fetch(
-        `https://api.vk.com/method/users.get?user_ids=${data.user_id}&fields=photo_200&access_token=${data.access_token}&v=5.199`
-    )
-    const vkData = await vkRes.json()
-    const vkUser = vkData.response?.[0]
+  // SDK сам делает запрос к VK с нужным origin
+  const userInfo = await VKID.Auth.getUserInfo(data.access_token)
+  console.log('userInfo:', userInfo)
 
-    if (!vkUser) {
-        console.error('VK users.get failed:', vkData)
-        alert('Не удалось получить профиль ВК')
-        return
-    }
+  const user = userInfo?.user
+  if (!user) {
+    alert('Не удалось получить профиль')
+    return
+  }
 
-    // На сервер шлём уже готовый профиль
-    const res = await fetch('/api/auth/vk/callback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-        vk_id: vkUser.id,
-        first_name: vkUser.first_name,
-        last_name: vkUser.last_name,
-        photo_200: vkUser.photo_200 || null,
-        }),
-    })
+  const res = await fetch('/api/auth/vk/callback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      vk_id: user.id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      photo_200: user.avatar || null,
+    }),
+  })
 
-    if (!res.ok) {
-        console.error('callback failed:', await res.json())
-        alert('Не удалось войти')
-        return
-    }
+  if (!res.ok) {
+    console.error('callback failed:', await res.json())
+    alert('Не удалось войти')
+    return
+  }
 
-    router.replace('/')
-    })
+  router.replace('/')
+})
   }
 
   return (
