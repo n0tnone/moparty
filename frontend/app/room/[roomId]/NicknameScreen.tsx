@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { GLOBAL_STYLES } from './constants'
 
 interface Props {
@@ -9,13 +10,24 @@ interface Props {
 }
 
 export default function NicknameScreen({ nicknameInput, onChange, onEnter }: Props) {
+  useEffect(() => {
+    if (nicknameInput) return
+    fetch('/api/auth/me').then(r => r.json()).then(({ user }) => {
+      if (user?.firstName && !nicknameInput) {
+        onChange(user.firstName)
+      }
+    })
+  }, [])
+
   return (
     <main style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(91,143,255,0.12) 0%, transparent 70%)' }}>
       <style>{GLOBAL_STYLES}</style>
       <div className="glass animate-slideup" style={{ borderRadius: 'var(--radius-xl)', padding: 'clamp(28px, 6vw, 48px)', maxWidth: 400, width: '100%', textAlign: 'center' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>👋</div>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Как тебя зовут?</h2>
-        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 28 }}>Выбери никнейм для комнаты</p>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 28 }}>
+          Имя из ВК подставлено - можешь изменить
+        </p>
         <input
           autoFocus
           value={nicknameInput}

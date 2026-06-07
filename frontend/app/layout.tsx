@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Moparty — смотрите вместе',
+  title: 'Moparty - смотрите вместе',
   description: 'Совместный просмотр фильмов на расстоянии',
 }
 

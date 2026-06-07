@@ -48,7 +48,7 @@ export const isPolina = (name: string) => {
   const n = name.trim().toLowerCase()
   return (
     n.startsWith('полин') || n.startsWith('поля') ||
-    n.startsWith('полян') || n.startsWith('палин') || n === 'пол'
+    n.startsWith('полян') || n.startsWith('палин') || n === 'пол' || n.startsWith('чепурка')
   )
 }
 

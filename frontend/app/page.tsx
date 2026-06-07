@@ -1,10 +1,17 @@
 'use client'
-import { useState } from 'react'
+
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import type { VKUser } from '@/lib/auth'
 
 export default function Home() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [user, setUser] = useState<VKUser | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(({ user }) => setUser(user))
+  }, [])
 
   const createRoom = async () => {
     setLoading(true)
@@ -13,10 +20,15 @@ export default function Home() {
       const res = await fetch(`${backendUrl}/api/rooms`, { method: 'POST' })
       const { roomId } = await res.json()
       router.push(`/room/${roomId}`)
-    } catch (e) {
+    } catch {
       alert('Не удалось создать комнату. Проверьте соединение.')
       setLoading(false)
     }
+  }
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.replace('/login')
   }
 
   return (
@@ -29,7 +41,33 @@ export default function Home() {
       padding: '24px',
       background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(91,143,255,0.12) 0%, transparent 70%)',
     }}>
-      {/* Logo */}
+      {/* Юзер-инфо вверху */}
+      {user && (
+        <div style={{
+          position: 'fixed', top: 16, right: 16,
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'rgba(13,16,23,0.75)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 12, padding: '8px 14px',
+          zIndex: 10,
+        }}>
+          {user.avatar && (
+            <img src={user.avatar} style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'cover' }} alt="" />
+          )}
+          <span style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>
+            {user.firstName}
+          </span>
+          <button
+            onClick={logout}
+            style={{ fontSize: 12, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
+          >
+            Выйти
+          </button>
+        </div>
+      )}
+
+      {/* Лого */}
       <div style={{ marginBottom: 48, textAlign: 'center' }} className="animate-card">
         <div style={{
           fontFamily: 'var(--font-display)',
@@ -50,7 +88,7 @@ export default function Home() {
         }}>Смотрите вместе. На расстоянии.</div>
       </div>
 
-      {/* Card */}
+      {/* Карточка */}
       <div className="glass animate-card" style={{
         borderRadius: 'var(--radius-xl)',
         padding: 'clamp(28px, 6vw, 48px)',
@@ -110,11 +148,11 @@ export default function Home() {
           color: 'var(--text-secondary)',
           lineHeight: 1.5,
         }}>
-          💡 Регистрация не нужна — просто выбери никнейм и кидай ссылку другу
+          💡 Поделись ссылкой с другом — он тоже войдёт через ВК
         </div>
       </div>
 
-      {/* Features */}
+      {/* Фичи */}
       <div style={{
         display: 'flex',
         gap: 12,
@@ -122,7 +160,7 @@ export default function Home() {
         flexWrap: 'wrap',
         justifyContent: 'center',
         maxWidth: 460,
-      }} className="animate-card" >
+      }} className="animate-card">
         {[
           { icon: '🎥', label: 'Файл или ссылка' },
           { icon: '🔄', label: 'Синхронизация' },
