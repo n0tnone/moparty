@@ -58,52 +58,44 @@ export default function LoginPage() {
       .on(VKID.WidgetEvents.ERROR, (error: any) => {
         console.error('[VK] WidgetEvents.ERROR:', error)
       })
-      .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload: any) => {
-        console.log('[VK] LOGIN_SUCCESS payload:', JSON.stringify(payload))
+    .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload: any) => {
+    const { code, device_id } = payload
 
-        const { code, device_id } = payload
-        console.log('[VK] code:', code, '| device_id:', device_id)
+    const data = await VKID.Auth.exchangeCode(code, device_id)
 
-        let data: any
-        try {
-          data = await VKID.Auth.exchangeCode(code, device_id)
-          console.log('[VK] exchangeCode raw result:', data)
-          console.log('[VK] exchangeCode JSON:', JSON.stringify(data))
-          console.log('[VK] access_token:', data?.access_token)
-          console.log('[VK] user_id:', data?.user_id)
-          console.log('[VK] keys:', Object.keys(data || {}))
-        } catch (e) {
-          console.error('[VK] exchangeCode THREW:', e)
-          return
-        }
+    // Получаем профиль прямо на клиенте (токен привязан к IP клиента)
+    const vkRes = await fetch(
+        `https://api.vk.com/method/users.get?user_ids=${data.user_id}&fields=photo_200&access_token=${data.access_token}&v=5.199`
+    )
+    const vkData = await vkRes.json()
+    const vkUser = vkData.response?.[0]
 
-        const body = {
-          access_token: data.access_token,
-          user_id: data.user_id,
-        }
-        console.log('[VK] sending to /api/auth/vk/callback:', JSON.stringify(body))
+    if (!vkUser) {
+        console.error('VK users.get failed:', vkData)
+        alert('Не удалось получить профиль ВК')
+        return
+    }
 
-        try {
-          const res = await fetch('/api/auth/vk/callback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          })
+    // На сервер шлём уже готовый профиль
+    const res = await fetch('/api/auth/vk/callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+        vk_id: vkUser.id,
+        first_name: vkUser.first_name,
+        last_name: vkUser.last_name,
+        photo_200: vkUser.photo_200 || null,
+        }),
+    })
 
-          const resBody = await res.json()
-          console.log('[VK] callback status:', res.status)
-          console.log('[VK] callback body:', JSON.stringify(resBody))
+    if (!res.ok) {
+        console.error('callback failed:', await res.json())
+        alert('Не удалось войти')
+        return
+    }
 
-          if (!res.ok) {
-            console.error('[VK] callback not ok, error:', resBody.error)
-            throw new Error('auth failed')
-          }
-
-          router.replace('/')
-        } catch (e) {
-          console.error('[VK] fetch to callback THREW:', e)
-        }
-      })
+    router.replace('/')
+    })
   }
 
   return (
