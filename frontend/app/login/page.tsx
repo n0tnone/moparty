@@ -59,32 +59,34 @@ export default function LoginPage() {
       .on(VKID.WidgetEvents.ERROR, (error: any) => {
         console.error('VK ID error:', error)
       })
-      .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload: any) => {
-        const { code, device_id } = payload
+    .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload: any) => {
+    console.log('VK payload:', JSON.stringify(payload))
+    const { code, device_id } = payload
 
-        try {
-          // Обмениваем code на токен через VK SDK
-          const data = await VKID.Auth.exchangeCode(code, device_id)
-          console.log('VK data:', data)
+    try {
+        const data = await VKID.Auth.exchangeCode(code, device_id)
+        console.log('exchangeCode result:', JSON.stringify(data))
 
-          // Отправляем токен на наш бэкенд для создания сессии
-          const res = await fetch('/api/auth/vk/callback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              access_token: data.access_token,
-              user_id: data.user_id,
-            }),
-          })
+        const res = await fetch('/api/auth/vk/callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            access_token: data.access_token,
+            user_id: data.user_id,
+        }),
+        })
 
-          if (!res.ok) throw new Error('auth failed')
+        const resBody = await res.json()
+        console.log('callback response:', res.status, JSON.stringify(resBody))
 
-          router.replace('/')
-        } catch (e) {
-          console.error('Login error:', e)
-          alert('Не удалось войти. Попробуй ещё раз.')
-        }
-      })
+        if (!res.ok) throw new Error('auth failed')
+
+        router.replace('/')
+    } catch (e) {
+        console.error('Login error full:', e)
+        alert('Не удалось войти. Попробуй ещё раз.')
+    }
+    })
   }
 
   return (
