@@ -15,7 +15,6 @@ export default function LoginPage() {
   const sdkReady = useRef(false)
 
   useEffect(() => {
-    // Проверяем уже залогинен ли
     fetch('/api/auth/me').then(r => r.json()).then(({ user }) => {
       if (user) router.replace('/')
     })
@@ -57,36 +56,54 @@ export default function LoginPage() {
         styles: { borderRadius: 12, width: 280 },
       })
       .on(VKID.WidgetEvents.ERROR, (error: any) => {
-        console.error('VK ID error:', error)
+        console.error('[VK] WidgetEvents.ERROR:', error)
       })
-    .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload: any) => {
-    console.log('VK payload:', JSON.stringify(payload))
-    const { code, device_id } = payload
+      .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload: any) => {
+        console.log('[VK] LOGIN_SUCCESS payload:', JSON.stringify(payload))
 
-    try {
-        const data = await VKID.Auth.exchangeCode(code, device_id)
-        console.log('exchangeCode result:', JSON.stringify(data))
+        const { code, device_id } = payload
+        console.log('[VK] code:', code, '| device_id:', device_id)
 
-        const res = await fetch('/api/auth/vk/callback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            access_token: data.access_token,
-            user_id: data.user_id,
-        }),
-        })
+        let data: any
+        try {
+          data = await VKID.Auth.exchangeCode(code, device_id)
+          console.log('[VK] exchangeCode raw result:', data)
+          console.log('[VK] exchangeCode JSON:', JSON.stringify(data))
+          console.log('[VK] access_token:', data?.access_token)
+          console.log('[VK] user_id:', data?.user_id)
+          console.log('[VK] keys:', Object.keys(data || {}))
+        } catch (e) {
+          console.error('[VK] exchangeCode THREW:', e)
+          return
+        }
 
-        const resBody = await res.json()
-        console.log('callback response:', res.status, JSON.stringify(resBody))
+        const body = {
+          access_token: data.access_token,
+          user_id: data.user_id,
+        }
+        console.log('[VK] sending to /api/auth/vk/callback:', JSON.stringify(body))
 
-        if (!res.ok) throw new Error('auth failed')
+        try {
+          const res = await fetch('/api/auth/vk/callback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
 
-        router.replace('/')
-    } catch (e) {
-        console.error('Login error full:', e)
-        alert('Не удалось войти. Попробуй ещё раз.')
-    }
-    })
+          const resBody = await res.json()
+          console.log('[VK] callback status:', res.status)
+          console.log('[VK] callback body:', JSON.stringify(resBody))
+
+          if (!res.ok) {
+            console.error('[VK] callback not ok, error:', resBody.error)
+            throw new Error('auth failed')
+          }
+
+          router.replace('/')
+        } catch (e) {
+          console.error('[VK] fetch to callback THREW:', e)
+        }
+      })
   }
 
   return (
@@ -99,7 +116,6 @@ export default function LoginPage() {
       padding: '24px',
       background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(91,143,255,0.12) 0%, transparent 70%)',
     }}>
-      {/* Лого */}
       <div style={{ marginBottom: 48, textAlign: 'center' }}>
         <div style={{
           fontFamily: 'var(--font-display)',
@@ -119,7 +135,6 @@ export default function LoginPage() {
         }}>Смотрите вместе. На расстоянии.</div>
       </div>
 
-      {/* Карточка */}
       <div className="glass" style={{
         borderRadius: 'var(--radius-xl)',
         padding: 'clamp(28px, 6vw, 48px)',
@@ -144,7 +159,6 @@ export default function LoginPage() {
           Нужно один раз — потом 30 дней без повторного входа
         </p>
 
-        {/* VK One Tap монтируется сюда */}
         <div
           ref={containerRef}
           style={{ display: 'flex', justifyContent: 'center', minHeight: 56 }}
@@ -160,7 +174,7 @@ export default function LoginPage() {
           color: 'var(--text-secondary)',
           lineHeight: 1.5,
         }}>
-          🔒 Только имя и аватарка — больше ничего не запрашиваем
+          Только имя и аватарка - больше ничего не запрашиваем
         </div>
       </div>
     </main>
