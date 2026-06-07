@@ -38,6 +38,7 @@ export default function LoginPage() {
     sdkReady.current = true
 
     const VKID = window.VKIDSDK
+    console.log('[SDK] Auth methods:', Object.keys(VKID.Auth))
 
     VKID.Config.init({
       app: 54626988,
