@@ -65,6 +65,7 @@ export default function LoginPage() {
         try {
           // Обмениваем code на токен через VK SDK
           const data = await VKID.Auth.exchangeCode(code, device_id)
+          console.log('VK data:', data)
 
           // Отправляем токен на наш бэкенд для создания сессии
           const res = await fetch('/api/auth/vk/callback', {
